@@ -22,7 +22,7 @@ The first two rows lose the response after commit. The third stops waiting befor
 
 ## Run locally
 
-Requires **Node 24.15–24.x** and **pnpm 11.25.0**. The tested local runtime is Node 24.19.0 / SQLite 3.53.3 on Windows. Node’s built-in SQLite API is used; no database service or credentials are needed.
+Requires **Node 24.15–24.x** and **pnpm 11.25.0**. Tested on Windows x64 with Node 24.15.0 / SQLite 3.51.3 and Node 24.19.0 / SQLite 3.53.3. Node’s built-in SQLite API is used; no database service or credentials are needed.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -49,6 +49,8 @@ pnpm history:report reports/<printed-history-run-id>
 Run these commands from the repository root. Each experiment uses fresh databases and cleans up its child processes. The ignored `reports/` directory holds raw evidence and source digests; the history viewer distinguishes actual observations from the deliberately changed lookup. A seed reproduces input choices and dispatch order, not OS scheduling. Reports record local provenance, not cryptographic execution attestation.
 
 Run `pnpm verify` separately for tests, strict type checking and the production client build.
+
+A separate [retention-boundary extension](docs/retention-boundary.md), run with `pnpm retention`, asks what happens when a downstream owner forgets the key. Two independent journals expose why an absent lookup cannot rule out an earlier effect—and why a retry sent before a local cutoff can still arrive after remote pruning. It does not change the main server's retention or add another UI.
 
 ## What is worth reviewing
 
