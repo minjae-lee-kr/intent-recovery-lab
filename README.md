@@ -10,13 +10,13 @@ The interesting question is not “can I retry?” It is **“what must stay the
 
 ## See the difference
 
-| After a response is lost **after commit** | Observable result                                         |
-| ----------------------------------------- | --------------------------------------------------------- |
-| Retry the same command with a fresh key   | Two reservations. The server sees two legitimate intents. |
-| Retry with the original key and command   | One reservation. The original receipt is recovered.       |
-| Stop waiting, then observe `404 unseen`   | Still uncertain. An earlier request can commit later.     |
+| After an uncertain request outcome      | Observable result                                         |
+| --------------------------------------- | --------------------------------------------------------- |
+| Retry the same command with a fresh key | Two reservations. The server sees two legitimate intents. |
+| Retry with the original key and command | One reservation. The original receipt is recovered.       |
+| Stop waiting, then observe `404 unseen` | Still uncertain. An earlier request can commit later.     |
 
-These are executed counterexamples, not prewritten success animations. The first row is an intentionally incomplete client policy; the interactive client preserves the original intent.
+The first two rows lose the response after commit. The third stops waiting before the original request commits. These are executed counterexamples, not prewritten success animations. The first row is an intentionally incomplete client policy; the interactive client preserves the original intent.
 
 ## Run locally
 

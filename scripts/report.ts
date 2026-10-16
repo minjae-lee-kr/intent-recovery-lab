@@ -77,6 +77,16 @@ function escape(value: unknown): string {
 const both = (value: Pair) =>
   `<span data-lang="ko">${escape(value[0])}</span>
 <span data-lang="en">${escape(value[1])}</span>`;
+function takeaway(scenario: ScenarioEvidence): string {
+  return both(
+    scenario.passed
+      ? text[scenario.id].takeaway
+      : [
+          '이번 실행에서는 예상 결과를 확인하지 못했습니다. 아래의 관측값은 검증된 성공 결과가 아닙니다. 요청·응답과 실패한 검사를 함께 확인하세요.',
+          'This execution did not establish the expected result. The observations below are not a verified success. Inspect the responses and failed checks together.',
+        ],
+  );
+}
 function effects(scenario: ScenarioEvidence): string {
   const ledger = [...scenario.observations]
     .reverse()
@@ -98,7 +108,7 @@ export function renderReport(report: ExperimentReport): string {
 <h3>${both(copy.title)}</h3>
 <span class="result ${scenario.passed ? '' : 'failed'}">${both(scenario.passed ? ['예상 결과 재현', 'Expected result observed'] : ['확인 필요', 'Needs investigation'])}</span>
 </div>
-<p>${both(copy.takeaway)}</p>
+<p>${takeaway(scenario)}</p>
 <details>
 <summary>${both(['요청·응답과 검증 근거 보기', 'Inspect requests, responses and checks'])}</summary>
 <p class="note">${both(['아래는 실제 실행에서 수집한 원본 관측과 검증 결과입니다. 필드명은 코드와 동일하게 유지했습니다.', 'These observations and assertions were collected from this execution. Field names match the code.'])}</p>
@@ -114,9 +124,10 @@ export function renderReport(report: ExperimentReport): string {
         `<article class="compare ${scenario.id === 'same-intent' ? 'corrected' : ''}">
 <p class="eyebrow">${both(scenario.id === 'fresh-key' ? ['의도적으로 불완전한 재시도', 'Deliberately incomplete retry'] : ['같은 요청을 유지한 복구', 'Recovery with the same intent'])}</p>
 <h2>${both(text[scenario.id].title)}</h2>
+${scenario.passed ? '' : `<p class="result failed">${both(['검증 실패 · 확인되지 않은 관측값', 'Verification failed · unverified observations'])}</p>`}
 <div class="count">${escape(effects(scenario))}<span>${both(['건의 예약', effects(scenario) === '1' ? 'reservation effect' : 'reservation effects'])}</span>
 </div>
-<p>${both(text[scenario.id].takeaway)}</p>
+<p>${takeaway(scenario)}</p>
 <a href="#${scenario.id}">${both(['실행 근거 보기', 'See the evidence'])} ↗</a>
 </article>`,
     )
@@ -145,14 +156,15 @@ export function renderReport(report: ExperimentReport): string {
 <section class="hero">
 <p class="eyebrow">${both(['실제 실행으로 확인한 결과', 'Evidence from an actual execution'])}</p>
 <h1>${both(['응답의 실패와\n예약의 실패는 다릅니다.', 'A lost response.\nNot necessarily a lost reservation.'])}</h1>
-<p>${both(['같은 통신 실패 뒤, 어떤 요청을 다시 보내느냐가 결과를 바꿉니다. 실제 HTTP와 SQLite로 차이를 재현했습니다.', 'After the same transport failure, the identity of the retry changes the result. Real HTTP requests and SQLite records make the distinction observable.'])}</p>
+<p>${both(report.passed ? ['같은 통신 실패 뒤, 어떤 요청을 다시 보내느냐가 결과를 바꿉니다. 실제 HTTP와 SQLite로 차이를 재현했습니다.', 'After the same transport failure, the identity of the retry changes the result. Real HTTP requests and SQLite records make the distinction observable.'] : ['이번 실행은 검증을 통과하지 못했습니다. 수집한 관측값은 원인 조사에 사용할 수 있지만 설계가 검증되었다는 근거는 아닙니다.', 'This execution did not pass verification. Its observations can support an investigation, but they do not establish the design claim.'])}</p>
 </section>
 <section id="results" class="comparison">${comparison}</section>
 <p class="verdict ${report.passed ? '' : 'failed'}">${both(report.passed ? ['이번 실행은 모든 시나리오의 예상 결과를 재현했습니다.', 'This execution reproduced every scenario’s expected result.'] : ['이번 실행은 검증을 통과하지 못했습니다. 공개 성과의 근거로 사용하지 마세요.', 'This execution did not pass verification. Do not use it as evidence of success.'])}</p>
 <section class="scenarios">
 <h2>${both(['결과가 달라지는 경계', 'The boundaries that change the outcome'])}</h2>${rows}</section>
 <section class="scope">
-<h2>${both(['이 실험이 보장하는 범위', 'What this experiment establishes'])}</h2>
+<h2>${both(['검증하려는 설계 범위', 'The design claim under test'])}</h2>
+${report.passed ? '' : `<p class="verdict failed">${both(['아래는 설계 목표입니다. 이번 실행에서 검증된 결과로 읽지 마세요.', 'The following is the design claim, not an established result of this failed execution.'])}</p>`}
 <p>${both(['기록을 보존하는 단일 SQLite 트랜잭션 안에서, 하나의 예약 요청 키는 최대 한 건의 예약만 만듭니다. 서로 다른 키의 의미상 중복 구매, 외부 결제의 원자성, 네트워크의 정확히 한 번 전달을 해결하지는 않습니다.', 'Within one SQLite transaction boundary and retained intent history, one intent creates at most one reservation effect. Different-key semantic duplicates, atomic external payments, and exactly-once network delivery are outside this claim.'])}</p>
 <p>${both(['프로세스 종료를 재현했으며, 임의의 디스크 장애나 정전은 주입하지 않았습니다. 시간 값은 실행 순서를 이해하기 위한 관측값이며 성능 벤치마크가 아닙니다.', 'The harness injects process termination, not arbitrary disk failure or power loss. Timings describe this execution and are not performance benchmarks.'])}</p>
 <p>${both(['재시도와 원자적 기록은 잘 알려진 패턴입니다. 이 작업의 초점은 클라이언트의 불확실성과 서버의 결과를 연결하고, 그 차이를 직접 재현하는 데 있습니다.', 'Idempotent retries and atomic records are established patterns. This lab focuses on connecting client uncertainty to durable outcomes and making that difference reproducible.'])}</p>
