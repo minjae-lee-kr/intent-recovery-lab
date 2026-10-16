@@ -13,6 +13,7 @@ Use a checkout containing this experiment: `experiment/observed-history`, or a p
 ```sh
 pnpm install --frozen-lockfile
 pnpm history
+pnpm history:report reports/<history-run-id>
 pnpm history:check reports/<history-run-id>/seed-104729.json
 pnpm history:check reports/<history-run-id>/seed-104729-stale-control.json
 ```
@@ -22,6 +23,8 @@ pnpm history:check reports/<history-run-id>/seed-104729-stale-control.json
 From another directory, use `pnpm --dir /absolute/path/to/intent-recovery-lab history:check reports/<history-run-id>/seed-104729.json`; the script runs at that repository root. Alternatively, `node /absolute/path/to/intent-recovery-lab/scripts/check-history.ts /absolute/path/to/trace.json` accepts an absolute trace path. With direct `node`, a relative trace path is resolved from your current working directory. `run-history.ts` always writes reports under its own repository, regardless of the caller's directory.
 
 Each report records the source manifest before and after execution, Git state and runtime versions. These are local provenance observations, not signatures or execution attestation. Edits reverted between the two snapshots are not detected. A seed repeats input choices and dispatch order, not OS scheduling or generated receipt values.
+
+`history:report` renders an existing recording into a new ignored `view-*` directory inside that run and opens a read-only loopback preview. It does not run the experiment again. The view preserves raw evidence bytes, compares the actual GET with the explicitly mutated control, and separates observer order from one possible witness. Its renderer revision is recorded separately from the original execution source. Korean/English preference, selected seed, explanation and expanded evidence are preserved when switching language. Invalid or incomplete evidence does not receive a successful narrative. Stop the preview with Ctrl+C; the original seven-scenario report is unchanged.
 
 ## The useful counterexample
 

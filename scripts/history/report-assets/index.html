@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Intent / Recovery — 관측 기록</title>
+    <link rel="stylesheet" href="report.css" />
+    <script src="report-data.js" defer></script>
+    <script src="report.js" defer></script>
+  </head>
+  <body>
+    <a class="skip" href="#results" data-copy="skip">결과로 바로가기</a>
+    <header>
+      <a class="brand" href="#top"
+        >Intent <span>/</span> Recovery <small data-copy="historyLabel">관측 기록</small></a
+      >
+      <div class="languages" role="group" aria-label="언어" id="languages">
+        <button type="button" data-language="ko" lang="ko">한국어</button>
+        <button type="button" data-language="en" lang="en">EN</button>
+      </div>
+    </header>
+    <main id="top">
+      <section class="hero">
+        <p class="eyebrow" data-copy="eyebrow">하나의 장부 · 서로 다른 관측</p>
+        <h1 data-copy="title">장부가 맞아도,<br />조회는 틀릴 수 있습니다.</h1>
+        <p class="intro" data-copy="intro">
+          예약 완료 뒤의 조회가 ‘없음’이라고 답한다면? 최종 상태가 같아도, 사용자가 본 기록은
+          다릅니다.
+        </p>
+      </section>
+      <div class="recording-line">
+        <span class="dot" aria-hidden="true"></span><span id="recording-state"></span
+        ><time id="recording-date"></time>
+      </div>
+      <section id="results" aria-labelledby="result-heading">
+        <div class="controls">
+          <h2 id="result-heading" data-copy="resultHeading">같은 기록을 두 가지로 읽기</h2>
+          <label class="seed-label"
+            ><span data-copy="seed">실행 시드</span
+            ><select id="seed"></select
+          ></label>
+        </div>
+        <div class="views" role="group" id="views" aria-label="설명 선택">
+          <button type="button" data-view="comparison" data-copy="comparisonTab">
+            완료된 예약의 조회
+          </button>
+          <button type="button" data-view="uncertainty" data-copy="uncertaintyTab">
+            타임아웃 뒤의 조회
+          </button>
+        </div>
+        <p id="run-warning" class="error" hidden></p>
+        <div id="content" aria-live="off">
+          <p role="status" data-copy="loading">저장된 실행 기록을 읽고 있습니다.</p>
+        </div>
+      </section>
+      <p class="seed-note" data-copy="seedNote">
+        시드는 요청 구성과 발송 순서를 반복합니다. OS 스케줄과 실제 커밋 순서를 재생하지 않습니다.
+      </p>
+      <section id="appendix"></section>
+    </main>
+    <footer>
+      <p data-copy="footer">
+        가상 데이터로 실행한 로컬 실험입니다. 현재 시스템에 연결하지 않습니다.
+      </p>
+      <a href="evidence.json" data-copy="rawReport">전체 원본 JSON</a
+      ><a href="recording.json" data-copy="recordingSource">기록 출처</a>
+    </footer>
+  </body>
+</html>

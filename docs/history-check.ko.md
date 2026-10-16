@@ -13,6 +13,7 @@
 ```sh
 pnpm install --frozen-lockfile
 pnpm history
+pnpm history:report reports/<history-run-id>
 pnpm history:check reports/<history-run-id>/seed-104729.json
 pnpm history:check reports/<history-run-id>/seed-104729-stale-control.json
 ```
@@ -22,6 +23,8 @@ pnpm history:check reports/<history-run-id>/seed-104729-stale-control.json
 다른 폴더에서는 `pnpm --dir /저장소/절대경로 history:check reports/<history-run-id>/seed-104729.json`을 사용하세요. 스크립트가 지정한 저장소 루트에서 실행됩니다. `node /저장소/절대경로/scripts/check-history.ts /기록파일/절대경로.json`처럼 직접 실행할 수도 있습니다. `node`에 상대 파일 경로를 넘기면 현재 작업 폴더를 기준으로 찾습니다. `run-history.ts`의 보고서 출력 위치는 작업 폴더와 무관하게 해당 스크립트가 속한 저장소 아래입니다.
 
 보고서에는 실행 전후의 소스 파일 해시, Git 상태와 런타임 버전이 포함됩니다. 이는 로컬에서 관측한 출처 정보이며 서명이나 실행 증명은 아닙니다. 두 관측 사이에서 변경했다가 복구한 파일은 탐지하지 못합니다. 시드는 요청 구성과 발송 순서를 재현하며 OS 스케줄이나 예약 확인 번호까지 같게 만들지는 않습니다.
+
+`history:report`는 저장된 기록을 해당 실행 폴더의 새 `view-*` 폴더에 표시하고, 읽기 전용 로컬 미리보기를 시작합니다. 실험을 다시 실행하지 않습니다. 원본 JSON은 그대로 보존하며 실제 GET과 의도적으로 변형한 대조군, 관측 순서와 가능한 실행 순서를 구분합니다. 화면을 만든 코드의 버전은 원래 실행한 소스와 별도로 기록합니다. 한·영 전환 시 선택한 시드·설명·펼친 근거를 유지하며, 잘못되거나 불완전한 근거를 성공한 해설로 표시하지 않습니다. Ctrl+C로 미리보기를 종료할 수 있습니다. 기존 일곱 시나리오 보고서는 바꾸지 않습니다.
 
 ## 이 실험이 구분하는 반례
 
