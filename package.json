@@ -1,0 +1,36 @@
+{
+  "name": "intent-recovery-lab",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Recover a durable commerce intent when the response disappears after commit.",
+  "engines": {
+    "node": ">=24.15 <25"
+  },
+  "packageManager": "pnpm@11.25.0",
+  "scripts": {
+    "test": "node --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "pnpm typecheck && vite build",
+    "start": "node src/server/main.ts",
+    "demo": "pnpm build && pnpm start",
+    "experiment": "node scripts/run-experiments.ts",
+    "report": "node scripts/serve-report.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "verify": "pnpm format:check && pnpm test && pnpm build"
+  },
+  "dependencies": {
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "prettier": "3.9.10",
+    "typescript": "7.0.2",
+    "vite": "8.3.4"
+  }
+}
