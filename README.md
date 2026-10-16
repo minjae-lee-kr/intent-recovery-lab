@@ -6,7 +6,7 @@
 
 A commerce recovery experiment spanning a React client, real HTTP, and a durable SQLite journal. It makes a subtle product failure visible: the browser can lose the response while the reservation succeeds.
 
-The interesting question is not “can I retry?” It is **“what must stay the same when I retry—and what do I actually know?”**
+Implemented the recovery state machine, retained decision journal and bounded API-history checker. SQLite supplies the single-writer storage boundary; the application decides what identity and uncertainty survive a retry.
 
 ## See the difference
 
@@ -18,26 +18,37 @@ The interesting question is not “can I retry?” It is **“what must stay the
 
 The first two rows lose the response after commit. The third stops waiting before the original request commits. These are executed counterexamples, not prewritten success animations. The first row is an intentionally incomplete client policy; the interactive client preserves the original intent.
 
+**A balanced ledger is not enough.** A separate [bounded history checker](docs/history-check.md) asks whether client responses admit a consistent order, including writes whose callers stopped waiting. Deliberately changing one later lookup to `404 unseen` leaves the final ledger intact but makes the observed history impossible. This is a checker control, not a server defect. A witness explains one finite recording; it does not reveal the actual commit order or prove every schedule.
+
 ## Run locally
 
 Requires **Node 24.15–24.x** and **pnpm 11.25.0**. The tested local runtime is Node 24.19.0 / SQLite 3.53.3 on Windows. Node’s built-in SQLite API is used; no database service or credentials are needed.
 
 ```sh
 pnpm install --frozen-lockfile
+```
+
+**Explore recovery in the browser:**
+
+```sh
 pnpm demo
 ```
 
 Open the printed loopback URL. Prepare a reservation and send it with the default **drop after commit** fault. The browser remains uncertain while the journal shows one reservation. Recover the result, switch languages, reload, or open the recovery link in another tab.
 
+**Run and inspect the evidence:**
+
 ```sh
-pnpm experiment  # real HTTP, child-process crashes, independent ledger checks
-pnpm report      # open the latest generated evidence report locally
-pnpm verify      # tests, strict type checking, production client build
+pnpm experiment  # seven recovery, crash and ledger scenarios
+pnpm report      # view their latest generated report
+
+pnpm history     # three seeds, 13 API operations per recorded history
+pnpm history:report reports/<printed-history-run-id>
 ```
 
-The experiment creates a dated `reports/<run-id>/` directory with a bilingual HTML report and raw `evidence.json`. Each scenario uses fresh temporary databases and cleans up its own child processes. The report records source digests before and after execution, runtime versions, requests, responses, assertions and failures. It does **not** claim to run the full test suite or attest execution cryptographically.
+Run these commands from the repository root. Each experiment uses fresh databases and cleans up its child processes. The ignored `reports/` directory holds raw evidence and source digests; the history viewer distinguishes actual observations from the deliberately changed lookup. A seed reproduces input choices and dispatch order, not OS scheduling. Reports record local provenance, not cryptographic execution attestation.
 
-With `experiment/observed-history` or a pinned commit containing it checked out, run `pnpm history` from the repository root for a separate [concurrent observation check](docs/history-check.md): a valid final ledger can still accompany an impossible intermediate lookup. It records actual invocation/response intervals, preserves pending-write uncertainty, and produces raw traces with replayable witnesses and a deliberately stale-read control when the baseline is eligible. The seven scenarios and their report remain unchanged.
+Run `pnpm verify` separately for tests, strict type checking and the production client build.
 
 ## What is worth reviewing
 
@@ -48,12 +59,14 @@ With `experiment/observed-history` or a pinned commit containing it checked out,
 
 ## Read the small core
 
-| File                                                 | Decision to inspect                                                            |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------ |
-| [`src/client/model.ts`](src/client/model.ts)         | Persist before send; uncertainty; response correlation; late-response handling |
-| [`src/server/store.ts`](src/server/store.ts)         | Serialized writer admission; coupled records; immutable outcomes               |
-| [`scripts/experiments.ts`](scripts/experiments.ts)   | Fresh-key counterexample; late commit; process death; two server processes     |
-| [`scripts/check-ledger.ts`](scripts/check-ledger.ts) | Independent effect, capacity and decision-history checks                       |
+| File                                                       | Decision to inspect                                                            |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [`src/client/model.ts`](src/client/model.ts)               | Persist before send; uncertainty; response correlation; late-response handling |
+| [`src/server/store.ts`](src/server/store.ts)               | Serialized writer admission; coupled records; immutable outcomes               |
+| [`scripts/experiments.ts`](scripts/experiments.ts)         | Fresh-key counterexample; late commit; process death; two server processes     |
+| [`scripts/check-ledger.ts`](scripts/check-ledger.ts)       | Independent effect, capacity and decision-history checks                       |
+| [`scripts/history/checker.ts`](scripts/history/checker.ts) | Bounded order search with shared capacity and unknown writes                   |
+| [`scripts/history/replay.ts`](scripts/history/replay.ts)   | Witness coverage and precedence checks using the same sequential model         |
 
 The UI supports Korean and English, persists language preference, preserves the experiment during switching, and uses keyboard-visible focus and reduced-motion preferences.
 

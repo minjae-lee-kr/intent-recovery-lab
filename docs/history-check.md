@@ -2,29 +2,9 @@
 
 [한국어](history-check.ko.md) · [Main lab](../README.md)
 
-This optional experiment asks whether the responses a client observed can be explained by a legal order of reservations and lookups. The final ledger can balance while an intermediate response is impossible: a reservation succeeds, then a later lookup says it does not exist.
+This experiment asks whether client responses admit a consistent order of reservations and lookups, including writes whose callers stopped waiting. A final ledger can balance while an intermediate response contradicts an already completed reservation.
 
-The original seven scenarios are unchanged. This experiment adds a separate history recorder and checker, using synthetic commands, actual HTTP, two owned Node processes and one shared local SQLite file. It does not implement replicated storage or an external payment system.
-
-## Run and inspect
-
-Use a checkout containing this experiment: `experiment/observed-history`, or a pinned commit from that branch. These commands assume the **repository root** as the working directory. The earlier `main` revision `46c889e` does not include the history commands.
-
-```sh
-pnpm install --frozen-lockfile
-pnpm history
-pnpm history:report reports/<history-run-id>
-pnpm history:check reports/<history-run-id>/seed-104729.json
-pnpm history:check reports/<history-run-id>/seed-104729-stale-control.json
-```
-
-`history` runs three fixed seeds with 13 operations each. Open `report.txt` in the printed output directory to read the bilingual result; `pnpm report` still serves the original seven-scenario report. The new ignored `reports/history-*` directory also contains complete `evidence.json`, standalone original traces and any generated synthetic controls. A control is generated only when its baseline prerequisites are met; missing observations remain unsuccessful and may leave no control file. The command does not replace the original report, update the portfolio hub, or run the full test suite. `history:check` reads a raw trace without starting servers. Its exit codes are 0 for a witness, 1 for a counterexample, 2 for inconclusive, 3 for invalid evidence and 64 for incorrect CLI usage. A counterexample is the expected result when checking a stale control.
-
-From another directory, use `pnpm --dir /absolute/path/to/intent-recovery-lab history:check reports/<history-run-id>/seed-104729.json`; the script runs at that repository root. Alternatively, `node /absolute/path/to/intent-recovery-lab/scripts/check-history.ts /absolute/path/to/trace.json` accepts an absolute trace path. With direct `node`, a relative trace path is resolved from your current working directory. `run-history.ts` always writes reports under its own repository, regardless of the caller's directory.
-
-Each report records the source manifest before and after execution, Git state and runtime versions. These are local provenance observations, not signatures or execution attestation. Edits reverted between the two snapshots are not detected. A seed repeats input choices and dispatch order, not OS scheduling or generated receipt values.
-
-`history:report` renders an existing recording into a new ignored `view-*` directory inside that run and opens a read-only loopback preview. It does not run the experiment again. The view preserves raw evidence bytes, compares the actual GET with the explicitly mutated control, and separates observer order from one possible witness. Its renderer revision is recorded separately from the original execution source. Korean/English preference, selected seed, explanation and expanded evidence are preserved when switching language. Invalid or incomplete evidence does not receive a successful narrative. Stop the preview with Ctrl+C; the original seven-scenario report is unchanged.
+The recorder sends fictional commands over HTTP to two Node processes sharing one local SQLite file. The bounded checker searches a separately written sequential model; SQLite supplies the single-writer storage boundary. This is not replicated storage or an external payment system.
 
 ## The useful counterexample
 
@@ -33,7 +13,32 @@ Each report records the source manifest before and after execution, Git state an
 3. The derived control replaces only that GET response with `404 unseen`.
 4. The final ledger and all other recorded events stay unchanged.
 
-The original history must have a legal witness. The control must be exhaustively rejected, while the unchanged ledger still passes the existing ledger checks. This demonstrates why final-state validation and temporal observation checks answer different questions. The mutated response is a checker sensitivity control, **not a defect observed in the server**.
+The original history must have a witness. The control must be exhaustively rejected while the ledger still passes its checks. This separates final-state validation from the consistency of client observations. The changed response tests the checker; **it is not a defect observed in the server**. A witness is one possible explanation of this finite recording, not the actual commit order or proof over every schedule.
+
+## Run and inspect
+
+Run these commands from the **repository root**:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm history
+pnpm history:report reports/<history-run-id>
+```
+
+`history` runs three fixed seeds with 13 operations each. Use the printed `history-run-id` to open the Korean/English viewer; `report.txt` is also readable without a server. The ignored `reports/history-*` directory contains complete `evidence.json`, standalone traces and eligible stale-read controls. Missing observations leave a run unsuccessful and may prevent control generation. The seven recovery/crash/ledger scenarios use the separate `pnpm experiment` and `pnpm report` commands. Run `pnpm verify` for the full test suite, type checking and client build.
+
+`history:report` renders a saved recording into a fresh ignored `view-*` directory and serves captured assets on loopback; it does not rerun the experiment. The view preserves raw evidence bytes and separates actual GETs from changed controls, observer order from a possible witness, and execution source from renderer source. Language switching preserves the selected seed, explanation and expanded evidence. Invalid or incomplete records receive no successful narrative. Stop the preview with Ctrl+C.
+
+Each report records the source manifest before and after execution, Git state and runtime versions. These are local provenance observations, not signatures or execution attestation. Edits reverted between the two snapshots are not detected. A seed repeats input choices and dispatch order, not OS scheduling or generated receipt values.
+
+To recheck a raw trace without starting servers:
+
+```sh
+pnpm history:check reports/<history-run-id>/seed-104729.json
+pnpm history:check reports/<history-run-id>/seed-104729-stale-control.json
+```
+
+Exit codes are 0 for a witness, 1 for a counterexample, 2 for inconclusive, 3 for invalid evidence and 64 for incorrect CLI usage. A stale control should return 1. From another directory, use `pnpm --dir /absolute/path/to/intent-recovery-lab history:check reports/<history-run-id>/seed-104729.json`. Direct `node scripts/check-history.ts` resolves relative input paths from the current working directory; `run-history.ts` writes reports under its own repository.
 
 ## A small sequential specification
 
