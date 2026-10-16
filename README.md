@@ -37,7 +37,7 @@ pnpm verify      # tests, strict type checking, production client build
 
 The experiment creates a dated `reports/<run-id>/` directory with a bilingual HTML report and raw `evidence.json`. Each scenario uses fresh temporary databases and cleans up its own child processes. The report records source digests before and after execution, runtime versions, requests, responses, assertions and failures. It does **not** claim to run the full test suite or attest execution cryptographically.
 
-On this experiment branch, `pnpm history` adds a separate [concurrent observation check](docs/history-check.md): a valid final ledger can still accompany an impossible intermediate lookup. It records actual invocation/response intervals, preserves pending-write uncertainty, and produces raw traces with replayable witnesses and a deliberately stale-read control. The seven scenarios and their report remain unchanged.
+With `experiment/observed-history` or a pinned commit containing it checked out, run `pnpm history` from the repository root for a separate [concurrent observation check](docs/history-check.md): a valid final ledger can still accompany an impossible intermediate lookup. It records actual invocation/response intervals, preserves pending-write uncertainty, and produces raw traces with replayable witnesses and a deliberately stale-read control when the baseline is eligible. The seven scenarios and their report remain unchanged.
 
 ## What is worth reviewing
 

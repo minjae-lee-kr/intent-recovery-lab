@@ -4,9 +4,11 @@
 
 This optional experiment asks whether the responses a client observed can be explained by a legal order of reservations and lookups. The final ledger can balance while an intermediate response is impossible: a reservation succeeds, then a later lookup says it does not exist.
 
-The original seven scenarios are unchanged. This branch adds a separate history recorder and checker, using synthetic commands, actual HTTP, two owned Node processes and one shared local SQLite file. It does not implement replicated storage or an external payment system.
+The original seven scenarios are unchanged. This experiment adds a separate history recorder and checker, using synthetic commands, actual HTTP, two owned Node processes and one shared local SQLite file. It does not implement replicated storage or an external payment system.
 
 ## Run and inspect
+
+Use a checkout containing this experiment: `experiment/observed-history`, or a pinned commit from that branch. These commands assume the **repository root** as the working directory. The earlier `main` revision `46c889e` does not include the history commands.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -15,7 +17,9 @@ pnpm history:check reports/<history-run-id>/seed-104729.json
 pnpm history:check reports/<history-run-id>/seed-104729-stale-control.json
 ```
 
-`history` runs three fixed seeds with 13 operations each. It writes a bilingual `report.txt`, complete `evidence.json`, standalone original traces and clearly named synthetic controls into a new ignored `reports/history-*` directory. It does not replace the original report, update the portfolio hub, or run the full test suite. `history:check` reads a raw trace without starting servers. Its exit codes are 0 for a witness, 1 for a counterexample, 2 for inconclusive, 3 for invalid evidence and 64 for incorrect CLI usage. A counterexample is the expected result when checking a stale control.
+`history` runs three fixed seeds with 13 operations each. Open `report.txt` in the printed output directory to read the bilingual result; `pnpm report` still serves the original seven-scenario report. The new ignored `reports/history-*` directory also contains complete `evidence.json`, standalone original traces and any generated synthetic controls. A control is generated only when its baseline prerequisites are met; missing observations remain unsuccessful and may leave no control file. The command does not replace the original report, update the portfolio hub, or run the full test suite. `history:check` reads a raw trace without starting servers. Its exit codes are 0 for a witness, 1 for a counterexample, 2 for inconclusive, 3 for invalid evidence and 64 for incorrect CLI usage. A counterexample is the expected result when checking a stale control.
+
+From another directory, use `pnpm --dir /absolute/path/to/intent-recovery-lab history:check reports/<history-run-id>/seed-104729.json`; the script runs at that repository root. Alternatively, `node /absolute/path/to/intent-recovery-lab/scripts/check-history.ts /absolute/path/to/trace.json` accepts an absolute trace path. With direct `node`, a relative trace path is resolved from your current working directory. `run-history.ts` always writes reports under its own repository, regardless of the caller's directory.
 
 Each report records the source manifest before and after execution, Git state and runtime versions. These are local provenance observations, not signatures or execution attestation. Edits reverted between the two snapshots are not detected. A seed repeats input choices and dispatch order, not OS scheduling or generated receipt values.
 
