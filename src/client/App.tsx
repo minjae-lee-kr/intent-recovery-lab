@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import type { Fault, LedgerView } from '../protocol.ts';
 import { createClient, isLedger } from './model.ts';
 import type { Client, StoragePort } from './model.ts';
+import { createCopyFeedback, visibleQuantity } from './feedback.ts';
 import { en, ko, events, issues, initialLanguage, LANGUAGE_KEY, phaseLabel } from './i18n.ts';
 import type { Language } from './i18n.ts';
 
@@ -152,10 +153,12 @@ export function App({ suppliedClient }: { suppliedClient?: Client }) {
     state.context?.attempted || state.phase === 'unknown' ? 'none' : 'drop-after-commit',
   );
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const [copyFeedback] = useState(() => createCopyFeedback(client.getSnapshot().intentId));
   const primaryButton = useRef<HTMLButtonElement | null>(null);
   const outcomeHeading = useRef<HTMLHeadingElement | null>(null);
   const focusHandoff = useRef<HTMLButtonElement | null>(null);
   const t = language === 'ko' ? ko : en;
+  const shownQuantity = visibleQuantity(state, quantity);
   const busy = state.phase === 'sending' || state.phase === 'reconciling';
   const ledger = useLedger(
     `${state.intentId ?? ''}:${state.phase}:${state.outcome?.journalSequence ?? ''}`,
@@ -198,8 +201,17 @@ export function App({ suppliedClient }: { suppliedClient?: Client }) {
     return () => window.removeEventListener('popstate', onPop);
   }, [client]);
   useEffect(() => {
-    setCopyState('idle');
-  }, [state.intentId]);
+    // Observe every model transition, including A → B → A within one React batch.
+    const syncIntent = () => {
+      if (copyFeedback.observeIntent(client.getSnapshot().intentId)) setCopyState('idle');
+    };
+    syncIntent();
+    const unsubscribe = client.subscribe(syncIntent);
+    return () => {
+      unsubscribe();
+      copyFeedback.invalidate();
+    };
+  }, [client, copyFeedback]);
   useEffect(() => {
     // Disabling/removing an action can drop focus to body. Keep continuity only
     // while the user has not deliberately moved to another control or surface.
@@ -259,11 +271,13 @@ export function App({ suppliedClient }: { suppliedClient?: Client }) {
             ? t.retry
             : t.recover;
   const copy = async () => {
+    const attempt = copyFeedback.begin(client.getSnapshot().intentId);
+    setCopyState('idle');
     try {
       await navigator.clipboard.writeText(location.href);
-      setCopyState('copied');
+      if (copyFeedback.isCurrent(attempt, client.getSnapshot().intentId)) setCopyState('copied');
     } catch {
-      setCopyState('failed');
+      if (copyFeedback.isCurrent(attempt, client.getSnapshot().intentId)) setCopyState('failed');
     }
   };
   return (
@@ -315,14 +329,21 @@ export function App({ suppliedClient }: { suppliedClient?: Client }) {
               </div>
               <Artwork />
             </div>
-            <Quantity
-              value={state.context?.command.quantity ?? quantity}
-              onChange={setQuantity}
-              disabled={Boolean(state.intentId)}
-              label={t.quantity}
-              id="quantity"
-              language={language}
-            />
+            {shownQuantity === null ? (
+              <div className="quantity">
+                <span>{t.quantity}</span>
+                <span>{t.quantityUnknown}</span>
+              </div>
+            ) : (
+              <Quantity
+                value={shownQuantity}
+                onChange={setQuantity}
+                disabled={Boolean(state.intentId)}
+                label={t.quantity}
+                id="quantity"
+                language={language}
+              />
+            )}
             {state.context && <p className="quiet-note command-note">{t.quantityLocked}</p>}
             <div className="client-observation">
               <p className="eyebrow">{t.clientLabel}</p>

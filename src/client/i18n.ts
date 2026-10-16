@@ -26,6 +26,7 @@ export const en = {
   offerDetail:
     'An imaginary creative workshop. One offer, limited places, a real local transaction.',
   quantity: 'Places',
+  quantityUnknown: 'Not known yet',
   place: 'place',
   places: 'places',
   quantityLocked: 'The command stays bound to this intent.',
@@ -128,6 +129,7 @@ export const ko: Record<keyof typeof en, string> = {
   offer: '무언가를 만드는 작은 시간.',
   offerDetail: '가상의 창작 워크숍. 하나의 상품과 제한된 정원, 실제 로컬 트랜잭션으로 진행합니다.',
   quantity: '예약 인원',
+  quantityUnknown: '아직 확인되지 않음',
   place: '명',
   places: '명',
   quantityLocked: '이 예약 요청에 연결된 인원은 바뀌지 않습니다.',
