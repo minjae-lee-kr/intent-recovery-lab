@@ -37,6 +37,8 @@ pnpm verify      # tests, strict type checking, production client build
 
 The experiment creates a dated `reports/<run-id>/` directory with a bilingual HTML report and raw `evidence.json`. Each scenario uses fresh temporary databases and cleans up its own child processes. The report records source digests before and after execution, runtime versions, requests, responses, assertions and failures. It does **not** claim to run the full test suite or attest execution cryptographically.
 
+On this experiment branch, `pnpm history` adds a separate [concurrent observation check](docs/history-check.md): a valid final ledger can still accompany an impossible intermediate lookup. It records actual invocation/response intervals, preserves pending-write uncertainty, and produces raw traces with replayable witnesses and a deliberately stale-read control. The seven scenarios and their report remain unchanged.
+
 ## What is worth reviewing
 
 - **Two identities with different lifetimes.** A client request sequence protects the current screen from stale responses. A retained intent key protects the server effect across retries, reloads and tabs.
