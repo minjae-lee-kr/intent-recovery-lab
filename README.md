@@ -6,7 +6,7 @@
 
 A commerce recovery experiment spanning a React client, real HTTP, and a durable SQLite journal. It makes a subtle product failure visible: the browser can lose the response while the reservation succeeds.
 
-Implemented the recovery state machine, retained decision journal and bounded API-history checker. SQLite supplies the single-writer storage boundary; the application decides what identity and uncertainty survive a retry.
+The client ignores responses from superseded requests while preserving the reservation key and command across retries and reloads.
 
 ## See the difference
 
@@ -54,23 +54,23 @@ A separate [retention-boundary extension](docs/retention-boundary.md), run with 
 
 ## What is worth reviewing
 
-- **Two identities with different lifetimes.** A client request sequence protects the current screen from stale responses. A retained intent key protects the server effect across retries, reloads and tabs.
+- **Two identities with different lifetimes.** The request sequence belongs to one client controller; the reservation key survives reloads.
 - **Uncertainty is a real state.** Transport errors, timeouts, local aborts and a point-in-time “unseen” lookup never become a business rejection. An app-return hint can trigger a lookup; it cannot mint a receipt.
 - **One atomic boundary.** The intent outcome, reservation effect and capacity update commit together. A different command under the same key conflicts. A capacity rejection is retained too.
 - **Evidence is tested as well.** An independently authored checker reconstructs capacity decisions in journal order. Mutation probes verify that mismatched response identities, unjustified rejections and stale checkpoint files cannot quietly produce green reports.
 
 ## Read the small core
 
-| File                                                       | Decision to inspect                                                            |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| [`src/client/model.ts`](src/client/model.ts)               | Persist before send; uncertainty; response correlation; late-response handling |
-| [`src/server/store.ts`](src/server/store.ts)               | Serialized writer admission; coupled records; immutable outcomes               |
-| [`scripts/experiments.ts`](scripts/experiments.ts)         | Fresh-key counterexample; late commit; process death; two server processes     |
-| [`scripts/check-ledger.ts`](scripts/check-ledger.ts)       | Independent effect, capacity and decision-history checks                       |
-| [`scripts/history/checker.ts`](scripts/history/checker.ts) | Bounded order search with shared capacity and unknown writes                   |
-| [`scripts/history/replay.ts`](scripts/history/replay.ts)   | Witness coverage and precedence checks using the same sequential model         |
-
-The UI supports Korean and English, persists language preference, preserves the experiment during switching, and uses keyboard-visible focus and reduced-motion preferences.
+| File                                                       | Decision to inspect                                                                          |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| [`src/client/model.ts`](src/client/model.ts)               | Persist before send; uncertainty; response correlation; late-response handling               |
+| [`src/client/App.tsx`](src/client/App.tsx)                 | Preserve state across language changes and same-intent navigation; conditional focus handoff |
+| [`src/client/feedback.ts`](src/client/feedback.ts)         | Prevent old clipboard completions from updating a later screen                               |
+| [`src/server/store.ts`](src/server/store.ts)               | Serialized writer admission; coupled records; immutable outcomes                             |
+| [`scripts/experiments.ts`](scripts/experiments.ts)         | Fresh-key counterexample; late commit; process death; two server processes                   |
+| [`scripts/check-ledger.ts`](scripts/check-ledger.ts)       | Independent effect, capacity and decision-history checks                                     |
+| [`scripts/history/checker.ts`](scripts/history/checker.ts) | Bounded order search with shared capacity and unknown writes                                 |
+| [`scripts/history/replay.ts`](scripts/history/replay.ts)   | Witness coverage and precedence checks using the same sequential model                       |
 
 ## Claim and limits
 
