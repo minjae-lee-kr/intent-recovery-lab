@@ -4,9 +4,11 @@
 
 [한국어](README.ko.md) · [Design decisions](docs/design.md) · [Security boundary](SECURITY.md)
 
-A commerce recovery experiment spanning a React client, real HTTP, and a durable SQLite journal. It makes a subtle product failure visible: the browser can lose the response while the reservation succeeds.
+A browser can lose the response after the server has reserved a place. Offering a fresh booking then risks creating a second reservation, even though the first request appeared to fail.
 
-The client ignores responses from superseded requests while preserving the reservation key and command across retries and reloads.
+This independent, synthetic lab follows that ambiguity through a React client, real HTTP and SQLite. The client saves the reservation key and command before sending; the server commits the outcome, reservation and capacity change together. Retries and reloads reuse the reservation identity, while a separate request sequence prevents late responses from replacing newer state.
+
+**Ending a request does not settle the reservation.** The design keeps an explicit uncertain state and retains outcomes for recovery. That costs storage and means the user may have to wait for a definitive answer instead of seeing an immediate success or rejection.
 
 ## See the difference
 
