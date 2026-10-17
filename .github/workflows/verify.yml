@@ -10,6 +10,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
+        node: ['24.15.0', '24.19.0']
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
@@ -18,7 +19,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24.19.0
+          node-version: ${{ matrix.node }}
           package-manager-cache: false
       - uses: pnpm/action-setup@d9184bf108216479bc5a137cc391f4d7b14c870b # v6.1.0
         with:
