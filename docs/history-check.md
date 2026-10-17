@@ -4,7 +4,7 @@
 
 This experiment asks whether client responses admit a consistent order of reservations and lookups, including writes whose callers stopped waiting. A final ledger can balance while an intermediate response contradicts an already completed reservation.
 
-The recorder sends fictional commands over HTTP to two Node processes sharing one local SQLite file. The bounded checker searches a separately written sequential model; SQLite supplies the single-writer storage boundary. This is not replicated storage or an external payment system.
+The recorder sends fictional commands over HTTP to two Node processes sharing one local SQLite file. The checker tries possible orders under a separately written sequential model: reservation and lookup rules applied one operation at a time. Its search is bounded; SQLite supplies the single-writer storage boundary. This is not replicated storage or an external payment system.
 
 ## The useful counterexample
 
@@ -13,7 +13,7 @@ The recorder sends fictional commands over HTTP to two Node processes sharing on
 3. The derived control replaces only that GET response with `404 unseen`.
 4. The final ledger and all other recorded events stay unchanged.
 
-The original history must have a witness. The control must be exhaustively rejected while the ledger still passes its checks. This separates final-state validation from the consistency of client observations. The changed response tests the checker; **it is not a defect observed in the server**. A witness is one possible explanation of this finite recording, not the actual commit order or proof over every schedule.
+The original history must have a witness: a legal ordering that explains the observations. The control must be exhaustively rejected while the ledger still passes its checks. This separates final-state validation from the consistency of client observations. The changed response tests the checker; **it is not a defect observed in the server**. A witness is one possible explanation of this finite recording, not the actual commit order or proof over every schedule.
 
 ## Run and inspect
 
@@ -68,14 +68,14 @@ After every caller has stopped waiting, the controller asks both writers to stop
 
 | Result         | Meaning                                                                                                                                                                 |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Witness        | At least one legal explanation exists for this finite recorded semantic history. Every returned witness is replayed by a separate verifier.                             |
+| Witness        | At least one legal explanation exists for this finite recorded semantic history. A separate verifier replays each returned witness against the model.                  |
 | Counterexample | The bounded search exhausted all eligible orders without a witness, or an observed response/ledger violated its contract.                                               |
 | Inconclusive   | The search budget, supported size or closing observation was insufficient. This is not success or a demonstrated consistency defect.                                    |
 | Invalid        | Evidence identities, event ordering or required structure cannot support analysis. An actually recorded malformed server response is a protocol counterexample instead. |
 
 The semantic checker may accept a trivial valid history. The **experiment** additionally requires both writers, measured overlap across writers, a same-key retry, a changed-command conflict, capacity rejection, two unknown writes, the early unseen lookup, retained outcomes for the unknown writes and a known read for the control. Missing coverage makes the run unsuccessful. Coverage and the semantic verdict remain separate fields.
 
-The search accepts at most 16 operations and two unknown writes. Default limits are 100,000 visited states and two seconds of search. Budget exhaustion remains inconclusive; it is never converted to a pass. The checker memoizes complete semantic states plus processed operations. It does not partition the shared capacity or use a first-found rejection as a universal failure. A witness is one possible order, not the actual commit order or attribution of an effect to a particular overlapping retry.
+The search accepts at most 16 operations and two unknown writes. Default limits are 100,000 visited states and two seconds of search. These limits bound the search work; running out of budget leaves the result inconclusive, not successful. The checker memoizes complete semantic states plus processed operations. It does not partition the shared capacity or use a first-found rejection as a universal failure. A witness is one possible order, not the actual commit order or attribution of an effect to a particular overlapping retry.
 
 ## Checking the checker
 

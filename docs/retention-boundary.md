@@ -2,7 +2,7 @@
 
 [한국어](retention-boundary.ko.md) · [Main lab](../README.md)
 
-A stable key prevents duplication only while the effect owner remembers it. This extension gives two owners separate SQLite journals and connects them through real HTTP. The downstream owner can commit an effect, lose its acknowledgement, then prune the key's retained response. A later `absent` lookup cannot distinguish that history from a request that never committed.
+The server in this fixture treats a reused key as new after deleting its retained response. The experiment connects two services, each with its own SQLite journal, over real HTTP. The downstream service can save an operation result (an effect), lose its acknowledgement, then delete the response stored under that key. A later `absent` lookup cannot distinguish a request that never executed from one whose stored response was later deleted.
 
 The main reservation server still retains its intent history indefinitely. This is a separate, bounded fixture, not a retention change to the application or a provider integration.
 
@@ -31,7 +31,9 @@ These are the expected outcomes checked against each actual run. **“Expected r
 
 ## A refusal policy is not a remote deadline
 
-The local owner persists the key, command, first-dispatch time and fixed contract before sending. Its retry cutoff is first dispatch + 1,000 retention units − 100 assumed budget units. After the cutoff, an absent lookup leaves `needs-reconciliation`; it does not reset the key or grant permission to retry. A positive matching receipt can still resolve the intent. Restart begins with unknown clock trust; unresolved POSTs are refused, and the persisted clock floor rejects rollback.
+The local service persists the key, command, first-dispatch time and fixed contract before sending. Its retry cutoff is first dispatch + 1,000 retention units − 100 assumed budget units. After the cutoff, an absent lookup leaves `needs-reconciliation`; it does not reset the key or grant permission to retry. A positive matching receipt can still resolve the intent. Refusal avoids authorizing a new dispatch from an ambiguous lookup, but also leaves a request that never ran unresolved.
+
+Restart begins with unknown clock trust; unresolved POSTs are refused, and the persisted clock floor rejects rollback.
 
 The fifth case exposes the remaining timing assumption:
 
@@ -58,9 +60,9 @@ The relay preserves the body, key and attempt identity. Its gate determines the 
 
 [`worker.mjs`](../scripts/retention/worker.mjs) contains the two fixture roles. The downstream transaction couples each synthetic effect with its retained response; only the response entry is pruned. The local transaction couples its accepted receipt and grant. There is no transaction spanning owners. The worker requires its parent IPC channel; clocks, pruning and socket-loss faults are parent controls, not public HTTP administration endpoints.
 
-[`check.mjs`](../scripts/retention/check.mjs) imports no worker validators. It reconstructs retained state in journal order, rejects premature pruning, and binds each local grant to the exact positive outcome of its correlated attempt. A merely existing historical receipt is insufficient. [`sensitivity.mjs`](../scripts/retention/sensitivity.mjs) checks an unchanged copied baseline and five invalid journal variants, including wrong receipts and pruning before expiry. The runner also checks that the two ambiguous cases have identical complete local tables and response bodies without renaming identities.
+[`check.mjs`](../scripts/retention/check.mjs) imports no worker validators. It reconstructs retained state in journal order. A run that deletes records before minimum retention is not accepted as an expiry counterexample. Each local grant must match the exact positive outcome of its correlated attempt; a merely existing historical receipt is insufficient. [`sensitivity.mjs`](../scripts/retention/sensitivity.mjs) checks an unchanged copied baseline and five invalid journal variants, including wrong receipts and pruning before expiry. The runner also checks that the two ambiguous cases have identical complete local tables and response bodies without renaming identities.
 
-The auditor can read downstream history after shutdown; the retry policy cannot. Therefore the auditor's knowledge must not be presented as an available reconciliation API. `needs-reconciliation` is an unresolved state, not an implemented operator workflow, refund or proof of non-execution.
+The auditor can read downstream history after shutdown; the retry policy cannot. Giving the policy that history would assume a recovery API this fixture does not implement. `needs-reconciliation` is an unresolved state, not an implemented operator workflow, refund or proof of non-execution.
 
 ## Boundaries and references
 
