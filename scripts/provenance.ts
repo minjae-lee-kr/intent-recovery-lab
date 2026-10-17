@@ -6,6 +6,15 @@ import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 
 const exec = promisify(execFile);
+// Read this repository's identity without inherited repository/config/trace overrides.
+// This is environment isolation for Git, not a sandbox for hostile source code.
+const gitEnvironment = (): NodeJS.ProcessEnv => ({
+  ...Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^GIT_/i.test(name))),
+  GIT_CONFIG_NOSYSTEM: '1',
+  GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : '/dev/null',
+  GIT_TERMINAL_PROMPT: '0',
+  GIT_OPTIONAL_LOCKS: '0',
+});
 export const projectRoot = fileURLToPath(new URL('../', import.meta.url));
 const roots = ['src', 'scripts', 'tests', 'docs', 'public', '.github'];
 const files = [
@@ -75,7 +84,13 @@ export async function sourceEvidence(root = projectRoot): Promise<SourceEvidence
     // Never attribute this nested project to an enclosing private workspace.
     await access(join(root, '.git'));
     const run = (args: string[]) =>
-      exec('git', args, { cwd: root, windowsHide: true, timeout: 5000, maxBuffer: 100_000 });
+      exec('git', args, {
+        cwd: root,
+        env: gitEnvironment(),
+        windowsHide: true,
+        timeout: 5000,
+        maxBuffer: 100_000,
+      });
     const top = (await run(['rev-parse', '--show-toplevel'])).stdout.trim();
     const normalized = (path: string) =>
       process.platform === 'win32' ? resolve(path).toLowerCase() : resolve(path);
