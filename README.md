@@ -6,9 +6,9 @@
 
 A browser can lose the response after the server has reserved a place. Offering a fresh booking then risks creating a second reservation, even though the first request appeared to fail.
 
-This independent, synthetic lab follows that ambiguity through a React client, real HTTP and SQLite. The client saves the reservation key and command before sending; the server commits the outcome, reservation and capacity change together. Retries and reloads reuse the reservation identity, while a separate request sequence prevents late responses from replacing newer state.
+This personal lab implements a fictional reservation service with a React UI, an HTTP server and SQLite. The client saves the reservation key and command before sending; the server commits the outcome, reservation and capacity change together. Retries and reloads reuse the reservation key. A separate request sequence prevents late responses from replacing newer state.
 
-**Ending a request does not settle the reservation.** The design keeps an explicit uncertain state and retains outcomes for recovery. That costs storage and means the user may have to wait for a definitive answer instead of seeing an immediate success or rejection.
+When no response arrives, the UI keeps the result **unknown**. Recovery requires retaining the outcome, which costs storage; the user may also have to wait for a definitive answer.
 
 ## See the difference
 
@@ -20,7 +20,7 @@ This independent, synthetic lab follows that ambiguity through a React client, r
 
 The first two rows lose the response after commit. The third stops waiting before the original request commits. These are executed counterexamples, not prewritten success animations. The first row is an intentionally incomplete client policy; the interactive client preserves the original intent.
 
-**A balanced ledger is not enough.** A separate [bounded history checker](docs/history-check.md) asks whether client responses admit a consistent order, including writes whose callers stopped waiting. Deliberately changing one later lookup to `404 unseen` leaves the final ledger intact but makes the observed history impossible. This is a checker control, not a server defect. A witness explains one finite recording; it does not reveal the actual commit order or prove every schedule.
+**A balanced ledger is not enough.** A separate [bounded history checker](docs/history-check.md) searches for an execution order that explains the recorded responses, including writes whose callers stopped waiting. Deliberately changing one later lookup to `404 unseen` leaves the final ledger intact but makes the observed history impossible. This is a checker test, not a recorded server defect. A matching order explains that recording; it does not reveal the actual commit order or prove every schedule.
 
 ## Run locally
 
@@ -61,7 +61,7 @@ A separate [retention-boundary extension](docs/retention-boundary.md), run with 
 - **One atomic boundary.** The intent outcome, reservation effect and capacity update commit together. A different command under the same key conflicts. A capacity rejection is retained too.
 - **Evidence is tested as well.** An independently authored checker reconstructs capacity decisions in journal order. Mutation probes verify that mismatched response identities, unjustified rejections and stale checkpoint files cannot quietly produce green reports.
 
-## Read the small core
+## Core implementation
 
 | File                                                       | Decision to inspect                                                                          |
 | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
