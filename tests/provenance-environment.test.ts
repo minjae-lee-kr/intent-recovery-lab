@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
@@ -71,6 +71,10 @@ test('provenance ignores ambient Git redirection and trace output while preservi
     const clean = evidence(project);
     assert.equal(clean.git.head, head);
     assert.equal(clean.git.dirty, false);
+    // Equivalent directory names must not fail the Git root identity check.
+    const alias = join(directory, 'project-alias');
+    await symlink(project, alias, process.platform === 'win32' ? 'junction' : 'dir');
+    assert.deepEqual(evidence(alias), clean);
     const overrides = {
       ...baseEnv(),
       GIT_DIR: join(unrelated, '.git'),
@@ -105,7 +109,10 @@ test('provenance ignores ambient Git redirection and trace output while preservi
     assert.deepEqual(await readFile(join(unrelated, '.git/index')), unrelatedIndex);
     // A mismatched worktree in local repository configuration is also not valid provenance.
     git(project, ['config', 'core.worktree', unrelated]);
-    assert.equal(resolve(git(project, ['rev-parse', '--show-toplevel'])), resolve(unrelated));
+    assert.equal(
+      await realpath(git(project, ['rev-parse', '--show-toplevel'])),
+      await realpath(unrelated),
+    );
     const mismatched = evidence(project);
     assert.deepEqual(mismatched.git, { state: 'unavailable' });
   } finally {

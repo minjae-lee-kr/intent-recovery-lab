@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
-import { access, lstat, readdir, readFile } from 'node:fs/promises';
+import { access, lstat, readdir, readFile, realpath } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
@@ -92,9 +92,12 @@ export async function sourceEvidence(root = projectRoot): Promise<SourceEvidence
         maxBuffer: 100_000,
       });
     const top = (await run(['rev-parse', '--show-toplevel'])).stdout.trim();
+    // Windows short paths (and directory aliases) can name the same physical root.
+    const [actualRoot, requestedRoot] = await Promise.all([realpath(top), realpath(root)]);
     const normalized = (path: string) =>
       process.platform === 'win32' ? resolve(path).toLowerCase() : resolve(path);
-    if (normalized(top) !== normalized(root)) throw new Error('Unexpected Git root.');
+    if (normalized(actualRoot) !== normalized(requestedRoot))
+      throw new Error('Unexpected Git root.');
     const head = (await run(['rev-parse', 'HEAD'])).stdout.trim();
     const status = (await run(['status', '--porcelain', '--untracked-files=all'])).stdout;
     git = { state: 'available', head, dirty: status.length > 0 };
