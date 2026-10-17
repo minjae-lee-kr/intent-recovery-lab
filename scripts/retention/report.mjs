@@ -65,6 +65,26 @@ export function retentionReportText(report) {
     'The command does not run the complete test suite. No UI or public service is started for the report.',
     '이 명령은 전체 테스트 모음을 실행하지 않습니다. 보고서용 UI나 공개 서비스를 시작하지 않습니다.',
   );
-  if (report.executionError) lines.push('', `Failure: ${report.executionError.message}`);
+  if (report.executionError) {
+    lines.push('', `Failure: ${report.executionError.message}`);
+    const context = report.executionError.context;
+    if (context) {
+      lines.push(
+        `Failure context / 실패 위치: ${context.scenario ?? 'run / 전체 실행'} · ${context.phase} · ${context.code}`,
+      );
+      if (context.request)
+        lines.push(
+          `Request / 요청: ${context.request.ordinal} · ${context.request.action} · HTTP ${context.request.status ?? 'not observed / 미관측'}`,
+        );
+      for (const worker of context.workers)
+        lines.push(
+          `Worker / 프로세스 ${worker.instance} ${worker.role}: ready ${worker.readyObserved ? 'observed / 관측' : 'not observed / 미관측'}; close ${worker.closeObserved ? `observed / 관측 (${worker.code ?? worker.signal})` : 'not observed / 미관측'}`,
+        );
+      lines.push(
+        'Observations are frozen at the first failure; later cleanup is not included. No close observation does not establish that a worker was alive.',
+        '최초 실패 시점의 관측이며 이후 정리 결과는 포함하지 않습니다. 종료 미관측이 프로세스의 생존을 보장하지 않습니다.',
+      );
+    }
+  }
   return lines.join('\n') + '\n';
 }

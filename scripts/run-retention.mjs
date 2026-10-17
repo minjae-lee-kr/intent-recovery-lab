@@ -5,6 +5,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { projectRoot, sourceEvidence } from './provenance.ts';
 import { collectRetention } from './retention/collect.mjs';
 import { retentionReportText } from './retention/report.mjs';
+import { failureContext } from './retention/failure.mjs';
 
 if (process.argv.length !== 2) {
   process.stderr.write('Usage: pnpm retention (no arguments)\n');
@@ -23,8 +24,9 @@ if (process.argv.length !== 2) {
   } catch (error) {
     // Keep machine-specific paths and stack traces out of shareable evidence.
     executionError = {
-      name: error instanceof Error ? error.name : 'UnknownError',
+      name: 'RetentionFixtureFailure',
       message: 'The bounded fixture did not establish its expected result.',
+      ...(failureContext(error) ? { context: failureContext(error) } : {}),
     };
     process.stderr.write(`${executionError.message}\n`);
   }

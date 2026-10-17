@@ -7,6 +7,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import assert from 'node:assert/strict';
 import { audit } from './check.mjs';
 import { mutationControls } from './sensitivity.mjs';
+import { captureFailure } from './failure.mjs';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 export const fixture = {
@@ -33,12 +34,30 @@ function bounded(promise, ms) {
     }),
   ]).finally(() => clearTimeout(timer));
 }
-export async function launch(role, path, providerUrl, log = []) {
-  const child = spawn(
-    process.execPath,
-    [join(here, 'worker.mjs'), role, path, ...(providerUrl ? [providerUrl] : [])],
-    { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe', 'ipc'] },
-  );
+export async function launch(
+  role,
+  path,
+  providerUrl,
+  log = [],
+  state = { phase: 'launch', workers: [] },
+) {
+  const worker = {
+    instance: state.workers.length + 1,
+    role,
+    readyObserved: false,
+    closeObserved: false,
+  };
+  state.workers.push(worker);
+  let child;
+  try {
+    child = spawn(
+      process.execPath,
+      [join(here, 'worker.mjs'), role, path, ...(providerUrl ? [providerUrl] : [])],
+      { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe', 'ipc'] },
+    );
+  } catch (error) {
+    throw captureFailure(error, state);
+  }
   let stderr = '',
     closed = false,
     request = 0;
@@ -46,6 +65,7 @@ export async function launch(role, path, providerUrl, log = []) {
   child.stderr.on('data', (b) => (stderr = (stderr + b.toString()).slice(-4000)));
   const exit = new Promise((resolve) =>
     child.once('close', (code, signal) => {
+      Object.assign(worker, { closeObserved: true, code, signal });
       closed = true;
       resolve({ code, signal });
     }),
@@ -74,14 +94,19 @@ export async function launch(role, path, providerUrl, log = []) {
       ]),
       5000,
     );
+    assert.equal(start.pid, child.pid);
+    assert.equal(start.role, role);
+    assert.match(start.url, /^http:\/\/127\.0\.0\.1:\d+$/);
+    worker.readyObserved = true;
   } catch (error) {
-    if (!closed) child.kill('SIGKILL');
-    await bounded(exit, 5000);
-    throw error;
+    const failure = captureFailure(error, state);
+    try {
+      if (!closed) child.kill('SIGKILL');
+      await bounded(exit, 5000);
+    } finally {
+      throw failure;
+    }
   }
-  assert.equal(start.pid, child.pid);
-  assert.equal(start.role, role);
-  assert.match(start.url, /^http:\/\/127\.0\.0\.1:\d+$/);
   observe(log, 'process-ready', { role, pid: child.pid });
   const rpc = async (type, value) => {
     const id = ++request;
@@ -108,17 +133,25 @@ export async function launch(role, path, providerUrl, log = []) {
     rpc,
     async stop() {
       if (closed) return;
+      let failure;
       try {
         await rpc('stop');
         const result = await bounded(exit, 5000);
         assert.equal(result.code, 0);
         observe(log, 'process-exit', { role, pid: child.pid, ...result });
+      } catch (error) {
+        failure = captureFailure(error, state);
       } finally {
-        if (!closed) {
-          child.kill('SIGKILL');
-          await bounded(exit, 5000);
+        try {
+          if (!closed) {
+            child.kill('SIGKILL');
+            await bounded(exit, 5000);
+          }
+        } catch (error) {
+          failure ??= captureFailure(error, state);
         }
       }
+      if (failure) throw failure;
     },
     async kill() {
       if (!closed) {
@@ -234,10 +267,13 @@ async function heldRetryRelay(upstream, log) {
   };
 }
 export async function collectRetention() {
-  const directory = await mkdtemp(join(resolve(tmpdir()), 'retention-horizon-'));
+  const state = { scenario: null, phase: 'setup', request: null, workers: [] };
+  let directory, failure;
   const evidence = { fixture, limits, cases: [], mutationControls: [] };
   try {
+    directory = await mkdtemp(join(resolve(tmpdir()), 'retention-horizon-'));
     for (const scenario of cases) {
+      Object.assign(state, { scenario, phase: 'setup', request: null, workers: [] });
       const log = [],
         caseDir = join(directory, scenario);
       await mkdir(caseDir);
@@ -246,37 +282,51 @@ export async function collectRetention() {
       const owned = [];
       let local, remote, relay;
       try {
-        remote = await launch('downstream', remotePath, undefined, log);
+        state.phase = 'launch';
+        remote = await launch('downstream', remotePath, undefined, log, state);
         owned.push(remote);
         if (scenario === 'guarded-delayed-arrival') relay = await heldRetryRelay(remote.url, log);
-        local = await launch('local', localPath, relay?.url ?? remote.url, log);
+        local = await launch('local', localPath, relay?.url ?? remote.url, log, state);
         owned.push(local);
         const clock = async (value) => {
+          state.phase = 'control';
           await local.rpc('clock', value);
           await remote.rpc('clock', value);
         };
         await clock(10000);
         const intentId = 'intent-same-business',
           policy = scenario === 'naive-expired' ? 'naive' : 'guarded';
+        let ordinal = 0;
         const send = async (action) => {
-          observe(log, 'local-http-invoke', { intentId, action });
-          const response = await fetch(`${local.url}/intents`, {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ intentId, units: 1, policy, action }),
-            signal: AbortSignal.timeout(4000),
-          });
-          const body = await response.json();
-          observe(log, 'local-http-response', {
-            intentId,
-            action,
-            status: response.status,
-            body,
-          });
-          return { status: response.status, body };
+          // The delayed request overlaps control RPCs. Its context must stay local.
+          let phase = 'fetch';
+          const request = { ordinal: ++ordinal, action, status: null };
+          try {
+            observe(log, 'local-http-invoke', { intentId, action });
+            const response = await fetch(`${local.url}/intents`, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ intentId, units: 1, policy, action }),
+              signal: AbortSignal.timeout(4000),
+            });
+            phase = 'body';
+            request.status = response.status;
+            const body = await response.json();
+            observe(log, 'local-http-response', {
+              intentId,
+              action,
+              status: response.status,
+              body,
+            });
+            return { status: response.status, body };
+          } catch (error) {
+            failure ??= captureFailure(error, { ...state, phase, request });
+            throw failure;
+          }
         };
         await remote.rpc('fault', scenario === 'guarded-precommit' ? 'before' : 'after');
         const first = await send('execute');
+        state.phase = 'assertion';
         assert.equal(first.status, 202);
         assert.equal(first.body.status, 'unknown');
         if (scenario === 'guarded-delayed-arrival') {
@@ -284,40 +334,50 @@ export async function collectRetention() {
           const retry = send('execute');
           // Attach a failure observer immediately while the parent opens the gate.
           void retry.catch(() => {});
+          state.phase = 'control';
           assert.equal(await bounded(relay.held, 1000), 'attempt-2');
           await clock(12000);
           await remote.rpc('prune');
           relay.release();
           const delayed = await retry;
+          state.phase = 'assertion';
           assert.equal(delayed.status, 200);
           assert.equal(delayed.body.status, 'confirmed');
         } else if (scenario === 'retained-positive') {
           await clock(10020);
           await remote.rpc('fault', 'after');
           const replay = await send('execute');
+          state.phase = 'assertion';
           assert.equal(replay.body.status, 'unknown');
           await clock(12000);
           const recovered = await send('reconcile');
+          state.phase = 'assertion';
           assert.equal(recovered.status, 200);
           assert.equal(recovered.body.status, 'confirmed');
         } else {
           await clock(12000);
           await remote.rpc('prune');
           const lookup = await send('reconcile');
+          state.phase = 'assertion';
           assert.equal(lookup.body.status, 'needs-reconciliation');
           const retried = await send('execute');
+          state.phase = 'assertion';
           assert.equal(
             retried.body.status,
             policy === 'naive' ? 'confirmed' : 'needs-reconciliation',
           );
         }
+        state.phase = 'restart';
         await local.stop();
-        local = await launch('local', localPath, remote.url, log);
+        state.phase = 'launch';
+        local = await launch('local', localPath, remote.url, log, state);
         owned.push(local);
         const restart = await send('execute');
+        state.phase = 'assertion';
         const unresolved = ['guarded-postcommit', 'guarded-precommit'].includes(scenario);
         assert.equal(restart.body.status, unresolved ? 'needs-reconciliation' : 'confirmed');
         if (unresolved) {
+          state.phase = 'control';
           await assert.rejects(local.rpc('clock', 10000), /monotonically/);
           observe(log, 'clock-rollback-rejected', {
             role: 'local',
@@ -325,11 +385,14 @@ export async function collectRetention() {
           });
           await local.rpc('clock', 12000);
           const again = await send('execute');
+          state.phase = 'assertion';
           assert.equal(again.body.status, 'needs-reconciliation');
         }
+        state.phase = 'cleanup';
         await local.stop();
         await relay?.stop();
         await remote.stop();
+        state.phase = 'audit';
         const checked = audit(localPath, remotePath, scenario);
         evidence.cases.push({ scenario, observations: log, audit: checked });
         if (scenario === 'naive-expired')
@@ -338,14 +401,29 @@ export async function collectRetention() {
             remotePath,
             join(caseDir, 'controls'),
           );
+      } catch (error) {
+        failure ??= captureFailure(error, state);
       } finally {
+        state.phase = 'cleanup';
         try {
           await relay?.stop();
+        } catch (error) {
+          failure ??= captureFailure(error, state);
         } finally {
-          await Promise.allSettled(owned.map((worker) => worker.kill()));
+          await Promise.allSettled(
+            owned.map(async (worker) => {
+              try {
+                await worker.kill();
+              } catch (error) {
+                failure ??= captureFailure(error, state);
+              }
+            }),
+          );
         }
       }
+      if (failure) throw failure;
     }
+    Object.assign(state, { scenario: null, phase: 'assertion', request: null, workers: [] });
     const pre = evidence.cases.find((c) => c.scenario === 'guarded-precommit');
     const post = evidence.cases.find((c) => c.scenario === 'guarded-postcommit');
     const visible = (c) =>
@@ -376,12 +454,22 @@ export async function collectRetention() {
       evidence.cases.length === 5 &&
       evidence.cases.every((c) => c.audit.expectedResultEstablished) &&
       evidence.mutationControls.every((c) => c.accepted === (c.kind === 'baseline'));
-    return evidence;
+  } catch (error) {
+    failure ??= captureFailure(error, state);
   } finally {
     // Remove only this invocation's fresh directory, after all owned workers stop.
-    const resolved = resolve(directory);
-    assert.equal(dirname(resolved), resolve(tmpdir()));
-    assert.ok(basename(resolved).startsWith('retention-horizon-'));
-    await rm(resolved, { recursive: true, force: true, maxRetries: 3 });
+    state.phase = 'cleanup';
+    try {
+      if (directory) {
+        const resolved = resolve(directory);
+        assert.equal(dirname(resolved), resolve(tmpdir()));
+        assert.ok(basename(resolved).startsWith('retention-horizon-'));
+        await rm(resolved, { recursive: true, force: true, maxRetries: 3 });
+      }
+    } catch (error) {
+      failure ??= captureFailure(error, state);
+    }
   }
+  if (failure) throw failure;
+  return evidence;
 }
