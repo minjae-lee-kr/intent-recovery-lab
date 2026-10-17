@@ -68,7 +68,7 @@ After every caller has stopped waiting, the controller asks both writers to stop
 
 | Result         | Meaning                                                                                                                                                                 |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Witness        | At least one legal explanation exists for this finite recorded semantic history. A separate verifier replays each returned witness against the model.                  |
+| Witness        | At least one legal explanation exists for this finite recorded semantic history. A separate verifier replays each returned witness against the model.                   |
 | Counterexample | The bounded search exhausted all eligible orders without a witness, or an observed response/ledger violated its contract.                                               |
 | Inconclusive   | The search budget, supported size or closing observation was insufficient. This is not success or a demonstrated consistency defect.                                    |
 | Invalid        | Evidence identities, event ordering or required structure cannot support analysis. An actually recorded malformed server response is a protocol counterexample instead. |
