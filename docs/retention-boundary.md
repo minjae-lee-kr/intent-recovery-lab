@@ -17,10 +17,12 @@ pnpm retention
 
 Open the printed `reports/retention-*/report.txt` for the bilingual result, or `evidence.json` for HTTP observations, both journals, attempt identities, audit results and source provenance. There is no additional UI. The command starts its own loopback processes, audits after they stop, then removes their temporary databases. Reports contain JSON/text only; no database files or local filesystem paths are exported. Run `node --test tests/retention.test.mjs` for the focused integration checks; `pnpm retention` does not run the complete test suite.
 
+A local grant records an accepted downstream receipt in the `grants` table. Unresolved intents remain in `intents`, and lookup events remain in the journal. Zero grants does not mean zero local records.
+
 | Case                                                | Downstream effects / local grants | What the fixture checks                                                                           |
 | --------------------------------------------------- | --------------------------------: | ------------------------------------------------------------------------------------------------- |
 | Two lost acknowledgements; retained positive lookup |                             1 / 1 | An in-window POST replays the receipt; an unpruned lookup can recover it after minimum retention. |
-| Same-key retry after pruning                        |                             2 / 1 | A valid local record can coexist with a repeated remote effect.                                   |
+| Same-key retry after pruning                        |                             2 / 1 | A single local grant can coexist with a repeated remote effect.                                   |
 | Refuse after cutoff; first request committed        |                             1 / 0 | The intent stays unresolved and no new POST is dispatched.                                        |
 | Refuse after cutoff; first request did not commit   |                             0 / 0 | Exactly the same local HTTP responses and database tables can hide a different remote history.    |
 | Eligible local send, late downstream arrival        |                             2 / 1 | A local cutoff cannot revoke an already dispatched request.                                       |
