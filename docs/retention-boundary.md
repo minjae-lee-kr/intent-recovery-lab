@@ -73,3 +73,19 @@ Source manifests use the main lab's `sourceEvidence()` before and after executio
 - [Node SQLite](https://nodejs.org/api/sqlite.html) supplies synchronous database operations. Neither fixture awaits network work inside a transaction.
 
 All data and failure schedules are original synthetic examples. The existing [local security boundary](../SECURITY.md) applies; the extension is not an external booking API or an authentication system.
+
+## When a run does not establish the result
+
+`NOT ESTABLISHED` and exit code `1` mean the complete comparison was not established. Keep that run's `evidence.json` and `report.txt`, even if a later run passes. Check `executionError` for a fixture failure and `sourceStable` for changes observed between the before/after source snapshots. A source change can invalidate a run without a fixture error.
+
+For a fixture failure, `executionError.context` records observations at the first failure, including when that failure occurs during cleanup:
+
+| Field                       | What it tells you                                                                                                                                                       |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scenario`, `phase`, `code` | The case, operation stage and bounded error category. These locate the failure; they do not establish its cause.                                                        |
+| `request`                   | The case-local request ordinal, `execute` or `reconcile`, and any observed HTTP status. `null` status means no status was recorded, not that the request had no effect. |
+| `workers`                   | For each owned worker, whether readiness was validated and a close event was observed. Both may be false; no close observation does not prove the worker was alive.     |
+
+Later cleanup does not overwrite this snapshot. Raw exception messages, stack traces, paths, response bodies and worker stderr are omitted from the failure context. If collection fails, the command does not publish partial case audits as a completed comparison; its case list is empty.
+
+During Windows verification of source [`f0e9ff9`](https://github.com/minjae-lee-kr/intent-recovery-lab/tree/f0e9ff9bc277184e81fcda8f49da338041960e8a) at Node 24.15.0, one run failed with an unexpected `ECONNRESET` at the caller-to-local-fixture boundary, before the first case restarted its local worker. The deliberate lost acknowledgements occur at the separate downstream boundary. Subsequent executions completed, but the original cause remains unconfirmed. The diagnostic fields improve the next failure record; they are not a fix for that unknown cause. Repeating a run until it passes would not resolve it.
