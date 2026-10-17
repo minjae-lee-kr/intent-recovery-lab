@@ -8,7 +8,7 @@
 2. The **client’s observation**: the request ended without a usable response.
 3. The **server’s durable outcome**: one reservation was committed.
 
-A timeout changes the second fact. It does not determine the third. Treating it as failure manufactures permission to issue a new purchase.
+A timeout changes the second fact. It does not determine the third. Treating it as a rejected reservation can lead the client to create a second reservation.
 
 ```mermaid
 sequenceDiagram
@@ -33,7 +33,7 @@ If a new key exists only inside a fetch callback, a reload can destroy the ident
 
 The URL is a recovery handle, not an authorization mechanism. This local demo has no accounts. A deployed service would need authenticated ownership checks, appropriate opaque identifiers and a deliberate privacy design.
 
-Two tabs with the same recovery link reuse one intent. Two independently created intents remain different purchases. There is no claim that `localStorage` provides atomic cross-tab allocation. Missing or corrupt local context permits lookup only; a validated terminal server outcome can restore the command. An unseen result cannot invent one.
+Two tabs with the same recovery link reuse one intent. Two independently created intents remain different purchases. There is no claim that `localStorage` provides atomic cross-tab allocation. If the locally stored reservation data is missing or corrupt, only lookup is allowed. A validated terminal server outcome can restore the command; an unseen result cannot.
 
 ## Why two identifiers?
 
@@ -41,13 +41,13 @@ The **request sequence** expires with a client controller. It prevents an older 
 
 Replacing the intent key on every retry solves neither problem. Keeping only the intent key also does not prevent a late `404` from overwriting newer knowledge. The client needs both lifetimes.
 
-## Why a retained business outcome?
+## Why retain the reservation outcome?
 
 The server starts a writer transaction before reading the intent or capacity. A replay returns the original semantic outcome; changed command contents conflict. Confirmation and capacity rejection are both terminal, retained outcomes.
 
-The same transaction records the intent, creates its effect and consumes capacity. Deferred foreign keys couple a confirmation to its receipt; immutable-record triggers prevent ordinary update/delete paths from rewriting history. An independent checker verifies effect cardinality, capacity conservation and whether each decision was justified at its journal position.
+For a confirmation, the same transaction records the intent, creates its effect and consumes capacity. Deferred foreign keys couple a confirmation to its receipt; immutable-record triggers prevent ordinary update/delete paths from rewriting history. An independent checker verifies effect cardinality, capacity conservation and whether each decision was justified at its journal position.
 
-This is not a cache of every HTTP response. A transient storage failure is uncertainty, not a retained business rejection. [Stripe’s API documentation](https://docs.stripe.com/api/idempotent_requests) describes its own response-replay semantics; this lab intentionally has a narrower domain-outcome contract.
+This is not a cache of every HTTP response. A transient storage failure is uncertainty, not a retained reservation rejection. [Stripe’s API documentation](https://docs.stripe.com/api/idempotent_requests) describes its own response-replay semantics; this lab retains reservation decisions rather than every response.
 
 ## Why SQLite?
 
@@ -55,13 +55,13 @@ SQLite keeps the atomic boundary inspectable and the experiment reproducible wit
 
 The store uses a rollback journal and `synchronous=FULL`. The harness blocks at a synchronous checkpoint, the parent terminates that child, and another process opens the same database. This tests process-death recovery around application commit. It does not test every internal SQLite write step, broken storage, a power outage, or network filesystems. See [SQLite’s atomic commit assumptions](https://sqlite.org/atomiccommit.html).
 
-Synchronous SQLite and a bounded busy timeout can block the Node event loop. That tradeoff is explicit here; moving to worker threads or a server database would change scheduling and operational behavior, not remove the need for coupled records and a stable intent.
+Synchronous SQLite and a bounded busy timeout can block the Node event loop. Moving to worker threads or a server database would change scheduling and operational behavior, not remove the need for coupled records and a stable intent.
 
 ## Why no automatic retry loop or retention TTL?
 
 The lab exposes each action so the uncertainty is observable. A production retry policy also needs budgets, backoff and admission control; retries themselves consume capacity. This experiment does not estimate those budgets.
 
-Intent history is retained indefinitely. Deleting it changes the guarantee: a sufficiently late request can look new again. A retention policy needs a stated recovery window and a response for expired identities. Adding a TTL without that product contract would make the demo simpler and the guarantee weaker.
+Intent history is retained indefinitely. Deleting it changes the guarantee: a sufficiently late request can look new again. A retention policy needs a stated recovery window and a response for expired identities. Adding a TTL without that contract weakens the guarantee.
 
 ## Why allow a new reservation while the old one is unknown?
 
@@ -73,4 +73,4 @@ An app-return callback is similarly limited: it triggers reconciliation only. Ca
 
 Each scenario records real HTTP observations and ledger snapshots. Crashes use a run-bound checkpoint marker, a blocked child and parent-driven termination. The two-process scenario observes convergence for its requests; it does not prove arbitrary-history linearizability or fairness.
 
-The checker is separate from store branches and is tested with deliberately inconsistent records and mutated responses. A green report still has a scope: the declared scenarios, the observed source files and the recorded runtime. It is neither a formal proof nor a tamper-proof attestation. Source should stay quiescent while an experiment runs.
+The checker is separate from store branches and is tested with deliberately inconsistent records and mutated responses. A green report still has a scope: the declared scenarios, the observed source files and the recorded runtime. It is neither a formal proof nor a tamper-proof attestation. Do not edit the source while a run is in progress.

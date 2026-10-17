@@ -52,11 +52,11 @@ Run these commands from the repository root. Each experiment uses fresh database
 
 Run `pnpm verify` separately for tests, strict type checking and the production client build.
 
-A separate [retention-boundary extension](docs/retention-boundary.md), run with `pnpm retention`, asks what happens when a downstream owner forgets the key. Two independent journals expose why an absent lookup cannot rule out an earlier effect—and why a retry sent before a local cutoff can still arrive after remote pruning. It does not change the main server's retention or add another UI.
+A separate [retention-boundary extension](docs/retention-boundary.md), run with `pnpm retention`, examines retries after the receiving service deletes its deduplication record. Two independent journals show why an absent lookup cannot rule out an earlier operation, and why a retry sent before the local cutoff can still arrive after deletion. It does not change the main server's retention or add another UI.
 
 ## What is worth reviewing
 
-- **Two identities with different lifetimes.** The request sequence belongs to one client controller; the reservation key survives reloads.
+- **Two identities with different lifetimes.** Keeping the reservation key does not stop a late `404 unseen` from replacing a newer confirmation. The client’s request sequence handles that.
 - **Uncertainty is a real state.** Transport errors, timeouts, local aborts and a point-in-time “unseen” lookup never become a business rejection. An app-return hint can trigger a lookup; it cannot mint a receipt.
 - **One atomic boundary.** The intent outcome, reservation effect and capacity update commit together. A different command under the same key conflicts. A capacity rejection is retained too.
 - **Evidence is tested as well.** An independently authored checker reconstructs capacity decisions in journal order. Mutation probes verify that mismatched response identities, unjustified rejections and stale checkpoint files cannot quietly produce green reports.
