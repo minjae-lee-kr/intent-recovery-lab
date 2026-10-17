@@ -29,7 +29,7 @@ function browserClient() {
 function useLedger(refreshKey: string) {
   const [view, setView] = useState<LedgerView | null>(null);
   const [failed, setFailed] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const latest = useRef(0);
   const controller = useRef<AbortController | null>(null);
   const refresh = useCallback(() => {
@@ -37,6 +37,7 @@ function useLedger(refreshKey: string) {
     controller.current?.abort();
     const abort = new AbortController();
     controller.current = abort;
+    setFailed(false);
     setLoading(true);
     // Diagnostic reads are independent of the intentionally short product deadline.
     const timer = setTimeout(() => abort.abort(), 3_000);
@@ -424,6 +425,20 @@ export function App({ suppliedClient }: { suppliedClient?: Client }) {
               </button>
             </div>
             <h2 id="server-heading">{t.serverTitle}</h2>
+            <p
+              className={`ledger-status${ledger.failed && !ledger.loading ? ' failed' : ''}`}
+              role="status"
+            >
+              {ledger.loading
+                ? ledger.view
+                  ? t.refreshingLedger
+                  : t.serverLoading
+                : ledger.failed
+                  ? ledger.view
+                    ? t.staleLedger
+                    : t.serverUnavailable
+                  : t.observedLedger}
+            </p>
             <div className={`server-state ${saved?.status ?? ''}`}>
               <div className="journal-symbol" aria-hidden="true">
                 <span />
@@ -433,9 +448,7 @@ export function App({ suppliedClient }: { suppliedClient?: Client }) {
               </div>
               <p>
                 {!ledger.view
-                  ? ledger.failed
-                    ? t.serverUnavailable
-                    : t.serverLoading
+                  ? t.noSnapshot
                   : !state.intentId
                     ? t.noServerIntent
                     : saved?.status === 'confirmed'
@@ -473,11 +486,6 @@ export function App({ suppliedClient }: { suppliedClient?: Client }) {
               </dl>
             )}
             <p className="quiet-note">{t.serverExplanation}</p>
-            {ledger.failed && ledger.view && (
-              <p className="ledger-warning" role="status">
-                {t.staleLedger}
-              </p>
-            )}
           </aside>
         </section>
         <section className="under-grid" aria-label={t.experiment}>

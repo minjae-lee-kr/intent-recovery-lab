@@ -458,10 +458,14 @@ select:disabled {
   line-height: 1.85;
   word-break: keep-all;
 }
-.ledger-warning {
+.ledger-status {
   margin: 12px 0 0;
+  min-height: 3.4em;
   font-size: 12px;
   line-height: 1.7;
+  color: #5e6d82;
+}
+.ledger-status.failed {
   color: #806239;
 }
 .server-detail {
